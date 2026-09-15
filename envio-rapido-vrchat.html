@@ -250,12 +250,15 @@ function hideEmptyState(){
 }
 
 /* ---------- image messages ---------- */
+let pendingImages = []; // {file, meta, bubble}
+
 function addImageMessage(file){
   hideEmptyState();
   const row = document.createElement('div');
   row.className='row sent';
   const bubble = document.createElement('div');
-  bubble.className='bubble';
+  bubble.className='bubble queued';
+  bubble.style.opacity='0.55';
 
   const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
   if(previewUrl){
@@ -271,14 +274,31 @@ function addImageMessage(file){
 
   const meta = document.createElement('div');
   meta.className='meta img-meta';
-  meta.innerHTML = `<span class="time">${nowLabel()}</span> <span class="check pending">·</span>`;
+  meta.innerHTML = `<span class="time">na fila</span> <span class="check pending">·</span>`;
   bubble.appendChild(meta);
 
   row.appendChild(bubble);
   messagesEl.appendChild(row);
   scrollDown();
+  updateSendCount();
 
-  uploadFile(file, meta, bubble);
+  pendingImages.push({file, meta, bubble});
+}
+
+function updateSendCount(){
+  const n = pendingImages.length;
+  $('sendBtn').textContent = n > 0 ? ('➤ '+n) : '➤';
+}
+
+async function sendAllPending(){
+  const batch = pendingImages;
+  pendingImages = [];
+  updateSendCount();
+  batch.forEach(({file, meta, bubble})=>{
+    bubble.style.opacity='1';
+    meta.querySelector('.time').textContent = nowLabel();
+    uploadFile(file, meta, bubble);
+  });
 }
 
 async function uploadFile(file, meta, bubble){
@@ -356,15 +376,16 @@ $('fileInput').addEventListener('change', e=>{
   e.target.value = '';
 });
 
-function trySendText(){
+function trySendAll(){
   const val = $('textInput').value.trim();
-  if(!val) return;
-  sendTextMessage(val);
-  $('textInput').value = '';
+  const hasImages = pendingImages.length > 0;
+  if(!val && !hasImages){ toast('Nada pra enviar ainda'); return; }
+  if(hasImages) sendAllPending();
+  if(val){ sendTextMessage(val); $('textInput').value=''; }
 }
-$('sendBtn').addEventListener('click', trySendText);
+$('sendBtn').addEventListener('click', trySendAll);
 $('textInput').addEventListener('keydown', e=>{
-  if(e.key === 'Enter') trySendText();
+  if(e.key === 'Enter') trySendAll();
 });
 </script>
 </body>
